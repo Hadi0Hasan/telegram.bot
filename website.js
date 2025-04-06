@@ -11,11 +11,14 @@ async function initBrowser() {
       args: [
         '--no-sandbox',
         '--disable-setuid-sandbox',
-        '--disable-dev-shm-usage'
-      ]
+        '--disable-dev-shm-usage',
+        '--single-process'
+      ],
+      // Add explicit executable path
+      executablePath: process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH || 
+        '/opt/render/.cache/ms-playwright/chromium-1161/chrome-linux/chrome'
     });
     page = await browser.newPage();
-    console.log('Browser initialized successfully');
   } catch (error) {
     console.error('Browser initialization failed:', error);
     throw error;
