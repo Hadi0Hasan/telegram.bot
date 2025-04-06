@@ -1,51 +1,58 @@
-const { firefox } = require('playwright');
+const { chromium } = require('playwright');
 require('dotenv').config();
 
 let browser;
 let page;
 
 async function initBrowser() {
-  browser = await firefox.launch({ 
-    headless: false,
-    executablePath: process.env.FIREFOX_PATH,
-    args: [
-      '--disable-gpu', // Disable GPU acceleration
-      '--disable-software-rasterizer',
-      '--no-sandbox'
-    ],
-    firefoxUserPrefs: {
-      'layers.acceleration.disabled': true,
-      'gfx.direct3d11.reuse-decoder-device': false
-    }
-  });
-  page = await browser.newPage();
+  try {
+    browser = await chromium.launch({
+      headless: true,
+      args: [
+        '--no-sandbox',
+        '--disable-setuid-sandbox',
+        '--disable-dev-shm-usage'
+      ]
+    });
+    page = await browser.newPage();
+    console.log('Browser initialized successfully');
+  } catch (error) {
+    console.error('Browser initialization failed:', error);
+    throw error;
+  }
 }
 
 async function login() {
-  await page.goto('https://agents.ichancy.com/login');
-  await page.fill(process.env.USERNAME_SELECTOR, process.env.WEBSITE_ADMIN_USERNAME);
-  await page.fill(process.env.PASSWORD_SELECTOR, process.env.WEBSITE_ADMIN_PASSWORD);
-  await page.click(process.env.LOGIN_BTN_SELECTOR);
-  await page.waitForTimeout(20000);
+  try {
+    await page.goto('https://agents.ichancy.com/login');
+    
+    // Login selectors from your .env
+    await page.fill(process.env.USERNAME_SELECTOR, process.env.WEBSITE_ADMIN_USERNAME);
+    await page.fill(process.env.PASSWORD_SELECTOR, process.env.WEBSITE_ADMIN_PASSWORD);
+    await page.click(process.env.LOGIN_BTN_SELECTOR);
+    
+    await page.waitForTimeout(15000);
+    console.log('Logged in successfully');
+    return true;
+  } catch (error) {
+    console.error('Login failed:', error);
+    return false;
+  }
 }
 
-// Keep other functions (createUser, updateBalance) similar but update selectors
-
-module.exports = { initBrowser, login };
 async function createUser(username, password) {
   try {
     await page.click('.bc-icon-add-user');
-    await page.waitForSelector('.error-color > div:nth-child(1) > label:nth-child(1) > div:nth-child(1) > input:nth-child(1)');
+    await page.waitForLoadState('networkidle');
     
-    // Fill user details
-    await page.type('.error-color > div:nth-child(1) > label:nth-child(1) > div:nth-child(1) > input:nth-child(1)', username);
-    await page.type('.t-password > div:nth-child(1) > label:nth-child(1) > div:nth-child(1) > input:nth-child(1)', password);
+    await page.fill('.error-color > div > label > div > input', username);
+    await page.fill('.t-password > div > label > div > input', password);
     await page.click('button.s-medium:nth-child(2)');
-    await page.waitForTimeout(5000);
     
+    await page.waitForTimeout(5000);
     return true;
   } catch (error) {
-    console.error('Error creating user:', error);
+    console.error('User creation failed:', error);
     return false;
   }
 }
@@ -53,24 +60,21 @@ async function createUser(username, password) {
 async function updateBalance(username, amount, type) {
   try {
     await page.click('.bc-icon-transfer-bold');
-    await page.waitForTimeout(1000);
+    await page.waitForLoadState('networkidle');
     
-    // Select transaction type
     const selector = type === 'topup' 
-      ? 'div.crs-holder:nth-child(1) > div:nth-child(1) > div:nth-child(1) > label:nth-child(1)'
-      : 'div.crs-holder:nth-child(2) > div:nth-child(1) > div:nth-child(1) > label:nth-child(1)';
-    
+      ? 'div.crs-holder:nth-child(1) label'
+      : 'div.crs-holder:nth-child(2) label';
+      
     await page.click(selector);
+    await page.fill('.error-color > div > label > div > input', username);
+    await page.fill('input.placeholder', amount.toString());
+    await page.click('button.s-medium > span');
     
-    // Fill transaction details
-    await page.type('.error-color > div:nth-child(1) > label:nth-child(1) > div:nth-child(1) > input:nth-child(1)', username);
-    await page.type('input.placeholder', amount.toString());
-    await page.click('button.s-medium:nth-child(2) > span:nth-child(1)');
     await page.waitForTimeout(5000);
-    
     return true;
   } catch (error) {
-    console.error('Error updating balance:', error);
+    console.error('Balance update failed:', error);
     return false;
   }
 }
