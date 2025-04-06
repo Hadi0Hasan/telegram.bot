@@ -4,23 +4,22 @@ require('dotenv').config();
 let browser;
 let page;
 
+const { chromium } = require('playwright');
+
 async function initBrowser() {
   try {
-    browser = await chromium.launch({
+    return await chromium.launch({
       headless: true,
+      executablePath: '/opt/render/.cache/ms-playwright/chromium-1161/chrome-linux/chrome',
       args: [
         '--no-sandbox',
         '--disable-setuid-sandbox',
         '--disable-dev-shm-usage',
         '--single-process'
-      ],
-      // Add explicit executable path
-      executablePath: process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH || 
-        '/opt/render/.cache/ms-playwright/chromium-1161/chrome-linux/chrome'
+      ]
     });
-    page = await browser.newPage();
   } catch (error) {
-    console.error('Browser initialization failed:', error);
+    console.error('Chromium launch error:', error);
     throw error;
   }
 }
