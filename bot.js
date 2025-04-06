@@ -3,15 +3,31 @@ const TelegramBot = require('node-telegram-bot-api');
 const db = require('./database');
 const website = require('./website');
 
-// Initialize bot and website in proper order
 async function initialize() {
   try {
-    // Initialize browser and login first
+    // Initialize browser first
     await website.initBrowser();
-    await website.login();
     
-    // Start the bot after successful website connection
-    const bot = new TelegramBot(process.env.BOT_TOKEN, { polling: true });
+    // Attempt login with retries
+    let loggedIn = false;
+    for (let i = 0; i < 3; i++) {
+      loggedIn = await website.login();
+      if (loggedIn) break;
+      await new Promise(resolve => setTimeout(resolve, 5000));
+    }
+    
+    if (!loggedIn) throw new Error('Failed to login to website');
+
+    // Start Telegram bot
+    const bot = new TelegramBot(process.env.BOT_TOKEN, {
+      polling: true,
+      request: {
+        agentOptions: { 
+          rejectUnauthorized: false 
+        }
+      }
+    });
+
     let isBotActive = true;
 
     // Keyboards
@@ -36,7 +52,7 @@ async function initialize() {
       }
     };
 
-    // User states
+    // State management
     const userStates = {};
 
     // Helper functions
@@ -50,16 +66,14 @@ async function initialize() {
         try {
           await bot.sendMessage(user.telegramId, message);
         } catch (error) {
-          console.error(`Failed to send message to user ${user.telegramId}:`, error);
+          console.error(`Broadcast failed to ${user.telegramId}:`, error);
         }
       }
     }
 
-    // User commands
+    // Command handlers
     bot.onText(/إنشاء حساب/, async (msg) => {
-      if (!isBotActive) {
-        return bot.sendMessage(msg.chat.id, 'البوت تحت الصيانة');
-      }
+      if (!isBotActive) return;
       
       try {
         const user = db.prepare('SELECT * FROM users WHERE telegramId = ?').get(msg.from.id);
@@ -70,7 +84,7 @@ async function initialize() {
         userStates[msg.from.id] = { state: 'awaiting_username' };
         await bot.sendMessage(msg.chat.id, 'الرجاء إدخال اسم المستخدم:');
       } catch (error) {
-        console.error('Create account error:', error);
+        console.error('Account creation error:', error);
         bot.sendMessage(msg.chat.id, 'حدث خطأ، الرجاء المحاولة لاحقاً');
       }
     });
@@ -79,11 +93,10 @@ async function initialize() {
     bot.on('message', async (msg) => {
       if (!msg.text || !isBotActive) return;
 
-      const userId = msg.from.id;
-      const state = userStates[userId];
-      
       try {
-        // Handle username input
+        const userId = msg.from.id;
+        const state = userStates[userId];
+
         if (state?.state === 'awaiting_username') {
           userStates[userId] = {
             state: 'awaiting_password',
@@ -91,8 +104,6 @@ async function initialize() {
           };
           await bot.sendMessage(msg.chat.id, 'الرجاء إدخال كلمة المرور:');
         }
-        
-        // Handle password input
         else if (state?.state === 'awaiting_password') {
           const password = msg.text;
           const success = await website.createUser(state.username, password);
@@ -102,16 +113,13 @@ async function initialize() {
               INSERT INTO users (telegramId, username, password) 
               VALUES (?, ?, ?)
             `).run(userId, state.username, password);
-            
             await bot.sendMessage(msg.chat.id, 'تم إنشاء الحساب بنجاح!', userKeyboard);
           } else {
             await bot.sendMessage(msg.chat.id, 'فشل إنشاء الحساب، الرجاء المحاولة لاحقاً', userKeyboard);
           }
           delete userStates[userId];
         }
-        
-        // Handle balance operations
-        else if (state?.state === 'awaiting_topup' || state?.state === 'awaiting_withdraw') {
+        else if (state?.state?.startsWith('awaiting_')) {
           const amount = parseInt(msg.text);
           if (isNaN(amount)) {
             return bot.sendMessage(msg.chat.id, 'قيمة غير صالحة، الرجاء إدخال رقم');
@@ -126,7 +134,6 @@ async function initialize() {
               UPDATE users SET balance = balance ${type === 'topup' ? '+' : '-'} ? 
               WHERE telegramId = ?
             `).run(amount, userId);
-            
             await bot.sendMessage(msg.chat.id, `تم ${type === 'topup' ? 'شحن' : 'سحب'} ${amount} بنجاح!`, userKeyboard);
           } else {
             await bot.sendMessage(msg.chat.id, 'فشلت العملية، الرجاء التواصل مع الدعم', userKeyboard);
@@ -134,8 +141,8 @@ async function initialize() {
           delete userStates[userId];
         }
       } catch (error) {
-        console.error('Message handler error:', error);
-        await bot.sendMessage(msg.chat.id, 'حدث خطأ غير متوقع، الرجاء المحاولة لاحقاً');
+        console.error('Message handling error:', error);
+        bot.sendMessage(msg.chat.id, 'حدث خطأ غير متوقع، الرجاء المحاولة لاحقاً');
       }
     });
 
@@ -164,7 +171,7 @@ async function initialize() {
       }
     });
 
-    console.log('Bot is running...');
+    console.log('Bot is running successfully!');
     
   } catch (error) {
     console.error('Initialization failed:', error);
@@ -172,5 +179,4 @@ async function initialize() {
   }
 }
 
-// Start the application
 initialize();
