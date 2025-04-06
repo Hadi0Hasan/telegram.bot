@@ -1,7 +1,10 @@
 const Database = require('better-sqlite3');
-const db = new Database('users.db');
+const db = new Database('users.db', { 
+  verbose: console.log,
+  fileMustExist: false 
+});
 
-// Create tables
+// Initialize tables
 db.exec(`
   CREATE TABLE IF NOT EXISTS users (
     id INTEGER PRIMARY KEY,
@@ -22,11 +25,8 @@ db.exec(`
   CREATE TABLE IF NOT EXISTS bot_status (
     maintenance BOOLEAN DEFAULT FALSE
   );
+  
+  INSERT OR IGNORE INTO bot_status (maintenance) VALUES (0);
 `);
-
-// Initialize bot status
-db.prepare(`
-  INSERT OR IGNORE INTO bot_status (maintenance) VALUES (FALSE)
-`).run();
 
 module.exports = db;
