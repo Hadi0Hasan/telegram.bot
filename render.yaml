@@ -1,0 +1,12 @@
+services:
+  - type: web
+    name: telegram-bot
+    env: node
+    plan: free
+    buildCommand: |
+      npm install
+      npx playwright install --with-deps chromium
+    startCommand: npm start
+    envVars:
+      - key: PLAYWRIGHT_BROWSERS_PATH
+        value: /opt/render/.cache/ms-playwright
