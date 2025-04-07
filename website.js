@@ -5,23 +5,12 @@ let browser;
 let page;
 
 const { chromium } = require('playwright');
-
 async function initBrowser() {
-  try {
-    return await chromium.launch({
-      headless: true,
-      executablePath: '/opt/render/.cache/ms-playwright/chromium-1161/chrome-linux/chrome',
-      args: [
-        '--no-sandbox',
-        '--disable-setuid-sandbox',
-        '--disable-dev-shm-usage',
-        '--single-process'
-      ]
-    });
-  } catch (error) {
-    console.error('Chromium launch error:', error);
-    throw error;
-  }
+  return chromium.launch({
+    headless: true,
+    executablePath: '/opt/render/.cache/ms-playwright/chromium-1161/chrome-linux/chrome',
+    args: ['--no-sandbox', '--disable-setuid-sandbox']
+  });
 }
 
 async function login() {
