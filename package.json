@@ -3,9 +3,8 @@
   "version": "1.0.0",
   "main": "bot.js",
   "scripts": {
-    "start": "node bot.js",
-    "install-browsers": "npx playwright install --with-deps chromium",
-    "postinstall": "npm run install-browsers"
+     "start": "node bot.js",
+    "postinstall": "npx playwright install chromium"
   },
   "dependencies": {
     "playwright": "^1.42.1",
